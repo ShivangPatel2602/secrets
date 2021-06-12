@@ -4,7 +4,8 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
 const mongoose = require("mongoose");
-const md5 = require("md5");
+const bcrypt = require("bcrypt");
+const saltRounds = 10;
 
 const app = express();
 
@@ -42,24 +43,27 @@ app.get("/login", function (req, res) {
 
 //When the post request is made from the register page
 app.post("/register", function (req, res) {
-    const newUser = new User({
-        email: req.body.username,
-        password: md5(req.body.password)
-    });
-    //After creating the newUser data, we will save it and check for errors
-    newUser.save(function (err) {
-        if (err) {
-            console.log(err);
-        } else {
-            res.render("secrets");
-        }
+
+    bcrypt.hash(req.body.password, saltRounds, function (err, hash) {
+        const newUser = new User({
+            email: req.body.username,
+            password: hash
+        });
+        //After creating the newUser data, we will save it and check for errors
+        newUser.save(function (err) {
+            if (err) {
+                console.log(err);
+            } else {
+                res.render("secrets");
+            }
+        });
     });
 });
 
 //when the post request is made from the login page
 app.post("/login", function (req, res) {
     const username = req.body.username;
-    const password = md5(req.body.password);
+    const password = req.body.password;
 
     User.findOne({ email: username }, function (err, foundUser) {
         //Checking if there are any errors
@@ -69,10 +73,12 @@ app.post("/login", function (req, res) {
             //If no errors, then go to the foundUsers parameter
             if (foundUser) {
                 //If the below code is true, then it confirms that the user has a data stored in the database and that he/she can login and go ahead to submit the secret
-                if (foundUser.password === password) {
-                    //Then the next obvious thing is to render the secrets page
-                    res.render("secrets");
-                }
+                bcrypt.compare(password, foundUser.password, function (err, result) {
+                    if (result === true) {
+                        //Then the next obvious thing is to render the secrets page
+                        res.render("secrets");
+                    }
+                });
             }
         }
     });
